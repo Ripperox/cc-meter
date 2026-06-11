@@ -1,0 +1,11 @@
+{
+  "name": "cc-meter",
+  "description": "Cross-session usage observability for Claude Code: a live status line (tokens, cost, context %, 5h/7d rate-limit bars) plus a usage-trends report across sessions — the persistence the built-in /usage doesn't provide.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Rishit-D",
+    "email": "rishitrdhote@gmail.com"
+  },
+  "license": "MIT",
+  "keywords": ["observability", "usage", "tokens", "cost", "status-line", "metrics"]
+}

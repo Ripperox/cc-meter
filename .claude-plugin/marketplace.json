@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "cc-meter",
+  "description": "Local marketplace for the cc-meter usage-observability plugin",
+  "owner": {
+    "name": "Rishit-D",
+    "email": "rishitrdhote@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "cc-meter",
+      "description": "Cross-session usage observability for Claude Code (status line + usage-trends report).",
+      "author": { "name": "Rishit-D" },
+      "category": "productivity",
+      "source": "./"
+    }
+  ]
+}
