@@ -28,15 +28,17 @@ Everything is **local** — it reads Claude Code's own status-line JSON and sess
 
 ## Install
 
-### Quick (what's wired up locally)
+### Quick — run the installer
 
-The status line and `SessionEnd` hook are registered in `~/.claude/settings.json`, and `/cc-meter` is a user command in `~/.claude/commands/`. Restart Claude Code and it's live.
+Clone the repo and run `install.sh`. It wires the status line, `SessionEnd` hook, and `/cc-meter` command into `~/.claude` **using this checkout's own path** (no hardcoded paths), merges into your existing `settings.json` (with a `.bak-ccmeter` backup), and is idempotent — safe to re-run.
 
-```jsonc
-// ~/.claude/settings.json
-"statusLine": { "type": "command", "command": "python3 /path/to/cc-meter/scripts/statusline.py", "padding": 0 },
-"hooks": { "SessionEnd": [ { "hooks": [ { "type": "command", "command": "python3 /path/to/cc-meter/scripts/log-session.py" } ] } ] }
+```bash
+git clone https://github.com/Ripperox/cc-meter.git
+cd cc-meter
+./install.sh
 ```
+
+Then restart Claude Code (or `/exit` and reopen).
 
 ### As a Claude Code plugin (for sharing)
 
@@ -47,7 +49,15 @@ claude plugin marketplace add /path/to/cc-meter
 claude plugin install cc-meter@cc-meter
 ```
 
-> The plugin provides the `SessionEnd` hook and `/cc-meter:history` command. The **main status line** is a user setting (`settings.json`), so point it at `scripts/statusline.py` regardless. If you enable the plugin, remove the manual `SessionEnd` hook from `settings.json` so it doesn't log twice.
+> The plugin provides the `SessionEnd` hook and `/cc-meter:history` command. The **main status line** is a user setting (`settings.json`), so point it at `scripts/statusline.py` regardless. If you enable the plugin, remove the manual `SessionEnd` hook from `settings.json` so it doesn't log twice (the installer's wiring and the plugin's hook would both fire).
+
+## Tests
+
+Pure-function tests (classifier + per-turn aggregation), no dependencies:
+
+```bash
+python3 -m unittest discover -s tests
+```
 
 ## Notes
 

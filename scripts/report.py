@@ -147,16 +147,26 @@ def find_current_transcript():
     return newest
 
 
-def is_user_prompt(o):
-    """A real user turn (typed prompt), not a tool_result continuation."""
-    if o.get("type") != "user":
-        return False
-    c = (o.get("message") or {}).get("content")
-    if isinstance(c, str):
-        return c.strip() != ""
-    if isinstance(c, list):
-        return any(isinstance(b, dict) and b.get("type") == "text" for b in c)
-    return False
+# Text markers that identify Claude-Code-injected content masquerading as a
+# user turn (slash-command bodies, skill preambles, local-command echoes,
+# system notifications). Only consulted on legacy transcripts that predate the
+# promptSource field — modern transcripts use promptSource instead.
+INJECTION_MARKERS = (
+    "<command-name>",
+    "<command-message>",
+    "<local-command-stdout>",
+    "<local-command-caveat>",
+    "<task-notification>",
+    "<system-reminder>",
+    "[Request interrupted",
+    "Base directory for this skill:",
+    "Use the Bash tool to run this command",
+)
+
+
+def transcript_uses_prompt_source(objs):
+    """True if any user record carries promptSource (modern Claude Code)."""
+    return any(o.get("type") == "user" and "promptSource" in o for o in objs)
 
 
 def prompt_text(o):
@@ -170,42 +180,89 @@ def prompt_text(o):
     return ""
 
 
+def _looks_injected(text):
+    head = text.lstrip()[:48]
+    return any(m in head for m in INJECTION_MARKERS)
+
+
+def is_user_prompt(o, has_prompt_source):
+    """A genuine user-typed turn — not a tool_result, skill preamble, slash
+    command body, system notification, or compaction summary.
+
+    Modern transcripts tag the real prompt with promptSource=="typed"; that's
+    authoritative. Older transcripts have no promptSource, so fall back to
+    structural flags + text markers.
+    """
+    if o.get("type") != "user":
+        return False
+    if has_prompt_source:
+        return o.get("promptSource") == "typed"
+    # ---- legacy fallback ----
+    if o.get("isMeta") or o.get("isCompactSummary"):
+        return False
+    if "toolUseResult" in o:
+        return False
+    c = (o.get("message") or {}).get("content")
+    if isinstance(c, str):
+        text = c
+    elif isinstance(c, list):
+        if not any(isinstance(b, dict) and b.get("type") == "text" for b in c):
+            return False  # pure tool_result / non-text blocks
+        text = prompt_text(o)
+    else:
+        return False
+    text = text.strip()
+    if not text:
+        return False
+    return not _looks_injected(text)
+
+
+def build_turns(objs):
+    """Group assistant token usage under the genuine user prompt that triggered
+    it. Returns one dict per prompt that received at least one assistant call."""
+    has_ps = transcript_uses_prompt_source(objs)
+    turns = []
+    cur = None
+    for o in objs:
+        if is_user_prompt(o, has_ps):
+            cur = {
+                "prompt": " ".join(prompt_text(o).split()),
+                "ts": o.get("timestamp"),
+                "input": 0, "output": 0, "cache_read": 0, "cache_write": 0,
+                "calls": 0, "model": None,
+            }
+            turns.append(cur)
+        elif o.get("type") == "assistant" and cur is not None:
+            u = (o.get("message") or {}).get("usage")
+            if isinstance(u, dict):
+                cur["input"] += u.get("input_tokens", 0) or 0
+                cur["output"] += u.get("output_tokens", 0) or 0
+                cur["cache_read"] += u.get("cache_read_input_tokens", 0) or 0
+                cur["cache_write"] += u.get("cache_creation_input_tokens", 0) or 0
+                cur["calls"] += 1
+                cur["model"] = (o.get("message") or {}).get("model") or cur["model"]
+    return [t for t in turns if t["calls"] > 0]
+
+
+def iter_records(path):
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                yield json.loads(line)
+            except Exception:
+                continue
+
+
 def turns_report():
     tx = find_current_transcript()
     if not tx:
         print("cc-meter: no active session transcript found.")
         return
 
-    turns = []
-    cur = None
-    with open(tx) as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                o = json.loads(line)
-            except Exception:
-                continue
-            if is_user_prompt(o):
-                cur = {
-                    "prompt": " ".join(prompt_text(o).split())[:34],
-                    "ts": o.get("timestamp"),
-                    "input": 0, "output": 0, "cache_read": 0, "cache_write": 0,
-                    "calls": 0, "model": None,
-                }
-                turns.append(cur)
-            elif o.get("type") == "assistant" and cur is not None:
-                u = (o.get("message") or {}).get("usage")
-                if isinstance(u, dict):
-                    cur["input"] += u.get("input_tokens", 0) or 0
-                    cur["output"] += u.get("output_tokens", 0) or 0
-                    cur["cache_read"] += u.get("cache_read_input_tokens", 0) or 0
-                    cur["cache_write"] += u.get("cache_creation_input_tokens", 0) or 0
-                    cur["calls"] += 1
-                    cur["model"] = (o.get("message") or {}).get("model") or cur["model"]
-
-    turns = [t for t in turns if t["calls"] > 0]
+    turns = build_turns(list(iter_records(tx)))
     if not turns:
         print("cc-meter: no completed prompts in the current session yet.")
         return
@@ -220,7 +277,7 @@ def turns_report():
         tc["cache_read"] += t["cache_read"]; tc["cost"] += c; tc["calls"] += t["calls"]
         print(
             f"{i:>2}  {hhmm(t['ts']):>5}  {fmt(t['input']):>6} {fmt(t['output']):>6} "
-            f"{fmt(t['cache_read']):>8} {t['calls']:>5}  ${c:>6.3f}  {t['prompt']}"
+            f"{fmt(t['cache_read']):>8} {t['calls']:>5}  ${c:>6.3f}  {t['prompt'][:34]}"
         )
     print("─" * 72)
     print(
@@ -239,7 +296,8 @@ def main():
         summary_report()
 
 
-try:
-    main()
-except Exception as e:
-    print("cc-meter: error:", e)
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        print("cc-meter: error:", e)
