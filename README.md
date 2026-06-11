@@ -10,6 +10,8 @@ Cross-session **usage observability for Claude Code**. Two pieces:
 
 2. **`/cc-meter` usage report** — token & cost **trends across sessions**: totals, a daily-spend sparkline, per-project breakdown, and top tools.
 
+3. **`/cc-meter turns`** — a **per-prompt breakdown of the current session**: every user turn with its input/output/cache tokens, API calls, and estimated cost, plus a session total. This is the "how much did each prompt and answer cost" view.
+
 ## Why this exists (vs. the built-in `/usage`)
 
 Claude Code already ships `/usage` (aliases `/cost`, `/stats`) for **per-session** cost, plan limits, and an activity breakdown. cc-meter does the thing `/usage` doesn't: **persistence and trends over time.** A `SessionEnd` hook appends each session's usage to `~/.claude/cc-meter/sessions.jsonl`, and the report aggregates across days/projects so you can see your usage *history*, not just the current session.
