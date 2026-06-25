@@ -97,11 +97,7 @@ def cmd_show():
 
 
 def cmd_interactive():
-    """Full-screen terminal segment picker. Requires a real TTY."""
-    if not sys.stdin.isatty():
-        sys.stderr.write("cc-meter: --interactive requires a real terminal.\n")
-        return 1
-
+    """Full-screen terminal segment picker."""
     cfg = load()
     current = set(statusline.selected_segments(cfg))
 
