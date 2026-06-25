@@ -62,32 +62,50 @@ cmd_md = os.path.join(claude, "commands", "cc-meter.md")
 with open(cmd_md, "w") as f:
     f.write(
         '---\n'
-        'description: cc-meter — usage report, or "turns"/"customize"/"update"\n'
+        'description: cc-meter — usage report (or "turns" for per-turn breakdown)\n'
         'allowed-tools: Bash(python3:*)\n'
         '---\n\n'
-        'Dispatch on `$ARGUMENTS`:\n\n'
-        '- **empty** or **`turns`** — run and show the stdout **verbatim** in a code '
-        'block (no summary, no commentary):\n\n'
-        '        python3 "%(repo)s/scripts/report.py" $ARGUMENTS\n\n'
-        '- **`customize`** — launch the interactive segment picker in the terminal.\n'
-        '  Run:\n\n'
-        '        python3 "%(repo)s/scripts/config.py" --interactive\n\n'
-        '  This command is interactive — it takes over the terminal. Before running it,\n'
-        '  say exactly one sentence: "The picker is now running in the Terminal panel below'
-        ' — click there, toggle with 1-7, preset with d/f/m, then s to save."\n'
-        '  After the command finishes (exit code 0), say: "Done — your status line updates'
-        ' on the next turn." Do not ask questions or modify config yourself.\n\n'
-        '- **`update`** — run and show its output (auto-detects git checkout vs plugin):\n\n'
-        '        python3 "%(repo)s/scripts/update.py"\n'
+        'Run and show stdout **verbatim** in a code block (no summary, no commentary):\n\n'
+        '    python3 "%(repo)s/scripts/report.py" $ARGUMENTS\n'
+        % {"repo": repo}
+    )
+
+cust_md = os.path.join(claude, "commands", "cc-meter-customize.md")
+with open(cust_md, "w") as f:
+    f.write(
+        '---\n'
+        'description: cc-meter — customize which status-line segments are shown\n'
+        'allowed-tools: Bash(python3:*)\n'
+        '---\n\n'
+        'Run this command exactly as-is and wait for it to finish:\n\n'
+        '    python3 "%(repo)s/scripts/config.py" --interactive\n\n'
+        'Before running, say one sentence: "The picker is running in the Terminal panel'
+        ' below — click there, toggle with 1-7, preset with d/f/m, s to save."\n'
+        'After it exits say: "Done — status line updates on the next turn."\n'
+        'Do not ask questions, show menus, or modify config yourself.\n'
+        % {"repo": repo}
+    )
+
+upd_md = os.path.join(claude, "commands", "cc-meter-update.md")
+with open(upd_md, "w") as f:
+    f.write(
+        '---\n'
+        'description: cc-meter — check for updates and apply if available\n'
+        'allowed-tools: Bash(python3:*)\n'
+        '---\n\n'
+        'Run and show stdout **verbatim** in a code block:\n\n'
+        '    python3 "%(repo)s/scripts/update.py"\n'
         % {"repo": repo}
     )
 
 print("cc-meter installed:")
-print("  status line   -> %s/scripts/statusline.py" % repo)
-print("  SessionStart  -> %s/scripts/update.py --check" % repo)
-print("  SessionEnd    -> %s/scripts/log-session.py" % repo)
-print("  /cc-meter cmd -> report.py / config.py / update.py (modes)")
-print("  settings      -> %s (backup: %s.bak-ccmeter)" % (settings, settings))
+print("  status line      -> %s/scripts/statusline.py" % repo)
+print("  SessionStart     -> %s/scripts/update.py --check" % repo)
+print("  SessionEnd       -> %s/scripts/log-session.py" % repo)
+print("  /cc-meter        -> usage report")
+print("  /cc-meter-customize -> interactive segment picker")
+print("  /cc-meter-update -> update checker")
+print("  settings         -> %s (backup: %s.bak-ccmeter)" % (settings, settings))
 PYEOF
 
 echo
