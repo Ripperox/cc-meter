@@ -96,17 +96,80 @@ def cmd_show():
     return 0
 
 
+def cmd_interactive():
+    """Full-screen terminal segment picker. Requires a real TTY."""
+    if not sys.stdin.isatty():
+        sys.stderr.write("cc-meter: --interactive requires a real terminal.\n")
+        return 1
+
+    cfg = load()
+    current = set(statusline.selected_segments(cfg))
+
+    def render():
+        sys.stdout.write("\033[2J\033[H")
+        print("cc-meter — customize status line")
+        print("─" * 38)
+        for i, key in enumerate(statusline.ALL_SEGMENTS, 1):
+            check = "✓" if key in current else " "
+            sample = _sample(key)
+            print(f"  {i}  [{check}] {key:<8}  {sample}")
+        print()
+        print("  Presets:  d default · f full · m minimal")
+        print("  Toggle 1-7 · s save · q quit")
+        print()
+
+    while True:
+        render()
+        try:
+            choice = input("> ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print("\nAborted.")
+            return 0
+
+        if choice == "q":
+            print("No changes saved.")
+            break
+        elif choice == "s":
+            ordered = [k for k in statusline.ALL_SEGMENTS if k in current]
+            if not ordered:
+                input("Select at least one segment. Press Enter to continue.")
+                continue
+            _set_segments(ordered)
+            sys.stdout.write("\033[2J\033[H")
+            print(f"Saved: {' · '.join(ordered)}")
+            print("Status line updates on your next Claude turn.")
+            break
+        elif choice == "d":
+            current = set(statusline.DEFAULT_SEGMENTS)
+        elif choice == "f":
+            current = set(statusline.ALL_SEGMENTS)
+        elif choice == "m":
+            current = set(PRESETS["minimal"])
+        elif choice.isdigit():
+            n = int(choice)
+            if 1 <= n <= len(statusline.ALL_SEGMENTS):
+                key = statusline.ALL_SEGMENTS[n - 1]
+                if key in current:
+                    current.discard(key)
+                else:
+                    current.add(key)
+
+    return 0
+
+
 def main(argv):
     if not argv:
         return cmd_show()
     a = argv[0]
     if a == "--show":
         return cmd_show()
+    if a == "--interactive":
+        return cmd_interactive()
     if a == "--set" and len(argv) > 1:
         return cmd_set(argv[1])
     if a == "--preset" and len(argv) > 1:
         return cmd_preset(argv[1])
-    sys.stderr.write("usage: config.py [--show | --set k1,k2 | --preset NAME]\n")
+    sys.stderr.write("usage: config.py [--show | --interactive | --set k1,k2 | --preset NAME]\n")
     return 2
 
 
