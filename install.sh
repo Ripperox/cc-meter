@@ -33,10 +33,12 @@ if os.path.exists(settings):
 
 statusline = 'python3 "%s/scripts/statusline.py"' % repo
 logsession = 'python3 "%s/scripts/log-session.py"' % repo
+checkupd = 'python3 "%s/scripts/update.py" --check' % repo
 
 data["statusLine"] = {"type": "command", "command": statusline, "padding": 0}
 
 hooks = data.setdefault("hooks", {})
+
 se = hooks.get("SessionEnd", []) or []
 # Drop any prior cc-meter entry (including an old hardcoded path), then re-add.
 se = [g for g in se
@@ -44,6 +46,13 @@ se = [g for g in se
                  for h in g.get("hooks", []))]
 se.append({"hooks": [{"type": "command", "command": logsession}]})
 hooks["SessionEnd"] = se
+
+ss = hooks.get("SessionStart", []) or []
+ss = [g for g in ss
+      if not any("update.py" in (h.get("command", "") or "")
+                 for h in g.get("hooks", []))]
+ss.append({"hooks": [{"type": "command", "command": checkupd, "async": True}]})
+hooks["SessionStart"] = ss
 
 with open(settings, "w") as f:
     json.dump(data, f, indent=2)
@@ -53,22 +62,33 @@ cmd_md = os.path.join(claude, "commands", "cc-meter.md")
 with open(cmd_md, "w") as f:
     f.write(
         '---\n'
-        'description: Claude Code usage — cross-session summary, or "turns" for per-prompt cost (cc-meter)\n'
-        'allowed-tools: Bash(python3:*)\n'
+        'description: cc-meter — usage report, or "turns"/"customize"/"update"\n'
+        'allowed-tools: Bash(python3:*), AskUserQuestion\n'
         '---\n\n'
-        'Use the Bash tool to run this command exactly (`$ARGUMENTS` is whatever the user '
-        'typed after `/cc-meter` — e.g. `turns` for a per-prompt breakdown of the current '
-        'session; empty for the cross-session summary):\n\n'
-        '    python3 "%s/scripts/report.py" $ARGUMENTS\n\n'
-        'Then show the script\'s stdout to the user **verbatim** inside a code block. '
-        'Do not summarize, analyze, reformat, or add any commentary — just display the '
-        'report output as-is.\n' % repo
+        'Dispatch on `$ARGUMENTS`:\n\n'
+        '- **empty** or **`turns`** — run and show the stdout **verbatim** in a code '
+        'block (no summary, no commentary):\n\n'
+        '        python3 "%(repo)s/scripts/report.py" $ARGUMENTS\n\n'
+        '- **`customize`** — let the user pick which status-line segments show:\n'
+        '  1. Run `python3 "%(repo)s/scripts/config.py" --show` and parse its JSON\n'
+        '     (`available` = `{key,label,sample}` per segment, `current` = enabled keys).\n'
+        '  2. Use **AskUserQuestion** (`multiSelect: true`) listing each segment as\n'
+        '     `label — sample`, pre-selecting the `current` keys. Offer the presets\n'
+        '     **default** / **full** / **minimal** too.\n'
+        '  3. Persist: a preset -> `python3 "%(repo)s/scripts/config.py" --preset NAME`;\n'
+        '     explicit ticks -> `python3 "%(repo)s/scripts/config.py" --set k1,k2,...`\n'
+        '     (canonical order: `model,tokens,ctx,cost,5h,time,7d`).\n'
+        '  4. Show a one-line preview and note the status line refreshes next turn.\n\n'
+        '- **`update`** — run and show its output (auto-detects git checkout vs plugin):\n\n'
+        '        python3 "%(repo)s/scripts/update.py"\n'
+        % {"repo": repo}
     )
 
 print("cc-meter installed:")
 print("  status line   -> %s/scripts/statusline.py" % repo)
+print("  SessionStart  -> %s/scripts/update.py --check" % repo)
 print("  SessionEnd    -> %s/scripts/log-session.py" % repo)
-print("  /cc-meter cmd -> %s/scripts/report.py" % repo)
+print("  /cc-meter cmd -> report.py / config.py / update.py (modes)")
 print("  settings      -> %s (backup: %s.bak-ccmeter)" % (settings, settings))
 PYEOF
 

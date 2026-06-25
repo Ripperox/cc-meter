@@ -1,10 +1,27 @@
 ---
-description: Claude Code usage — cross-session summary, or "turns" for per-prompt cost (cc-meter)
-allowed-tools: Bash(python3:*)
+description: cc-meter — usage report, or "turns"/"customize"/"update"
+allowed-tools: Bash(python3:*), AskUserQuestion
 ---
 
-Use the Bash tool to run this command exactly (`$ARGUMENTS` is whatever the user typed after the command — e.g. `turns` for a per-prompt breakdown of the current session; empty for the cross-session summary):
+Dispatch on `$ARGUMENTS`:
 
-    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/report.py" $ARGUMENTS
+- **empty** or **`turns`** — run and show the stdout **verbatim** in a code block
+  (no summary, no commentary):
 
-Then show the script's stdout to the user **verbatim** inside a code block. Do not summarize, analyze, reformat, or add any commentary — just display the report output as-is.
+      python3 "${CLAUDE_PLUGIN_ROOT}/scripts/report.py" $ARGUMENTS
+
+- **`customize`** — let the user pick which status-line segments show:
+  1. Run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/config.py" --show` and parse its JSON
+     (`available` = `{key,label,sample}` per segment, `current` = enabled keys).
+  2. Use **AskUserQuestion** (`multiSelect: true`) listing each segment as
+     `label — sample`, pre-selecting the `current` keys. Offer the presets
+     **default** / **full** / **minimal** too.
+  3. Persist the choice:
+     - a preset → `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/config.py" --preset NAME`
+     - explicit ticks → `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/config.py" --set k1,k2,...`
+       (keys in canonical order: `model,tokens,ctx,cost,5h,time,7d`).
+  4. Show a one-line preview of the result and note the status line refreshes next turn.
+
+- **`update`** — run and show its output (it auto-detects git checkout vs plugin):
+
+      python3 "${CLAUDE_PLUGIN_ROOT}/scripts/update.py"
