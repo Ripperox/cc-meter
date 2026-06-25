@@ -178,7 +178,8 @@ def main():
     sys.stdout.write(build_line(d if isinstance(d, dict) else {}, load_config()))
 
 
-try:
-    main()
-except Exception:
-    sys.stdout.write("cc-meter")
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception:
+        sys.stdout.write("cc-meter")
